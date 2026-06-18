@@ -17,24 +17,34 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
+import io.ktor.util.AttributeKey
 import kotlinx.serialization.json.Json
 import io.ktor.server.application.ApplicationStopped
 import org.openmbee.flexo.sysmlv2.apis.*
 
-lateinit var GlobalFlexoConfig: FlexoConfig
-lateinit var FlexoHttpClient: HttpClient
+val FlexoConfigKey = AttributeKey<FlexoConfig>("FlexoConfig")
+val FlexoHttpClientKey = AttributeKey<HttpClient>("FlexoHttpClient")
+
+val Application.globalFlexoConfig: FlexoConfig
+    get() = attributes[FlexoConfigKey]
+
+val Application.flexoHttpClient: HttpClient
+    get() = attributes[FlexoHttpClientKey]
+
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused")
 fun Application.module() {
-    GlobalFlexoConfig = flexoConfig
-    FlexoHttpClient = HttpClient() {
+    val config = flexoConfig
+    val client = HttpClient() {
         install(HttpTimeout) {
-            requestTimeoutMillis = GlobalFlexoConfig.defaultTimeout * 1000
+            requestTimeoutMillis = config.defaultTimeout * 1000
         }
     }
+    attributes.put(FlexoConfigKey, config)
+    attributes.put(FlexoHttpClientKey, client)
     environment.monitor.subscribe(ApplicationStopped) {
-        FlexoHttpClient.close()
+        client.close()
     }
     install(DefaultHeaders)
     install(CallLogging)
@@ -107,7 +117,7 @@ fun Application.module() {
         }
     }
     routing {
-        route(GlobalFlexoConfig.basePath) {
+        route(config.basePath) {
             BranchApi()
             CommitApi()
             DiffMergeApi()

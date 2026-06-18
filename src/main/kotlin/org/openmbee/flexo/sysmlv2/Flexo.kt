@@ -124,7 +124,7 @@ class SparqlUpdateBuilder {}
 
 class FlexoRequestBuilder(
     private val method: HttpMethod,
-    private val config: FlexoConfig = GlobalFlexoConfig
+    private val config: FlexoConfig
 ) {
     private var flexoProtocol = config.protocol
     private var flexoHost = config.host
@@ -253,24 +253,18 @@ class FlexoResponse(
 }
 
 suspend fun RoutingContext.flexoRequest(method: HttpMethod, setup: FlexoRequestBuilder.() -> Unit): FlexoResponse {
-    // prepare client
-    val client = FlexoHttpClient
-    // create request builder
-    val builder = FlexoRequestBuilder(method)
-    val auth = call.request.headers["Authorization"]?: GlobalFlexoConfig.auth
-    // forward auth header from client
+    val app = call.application
+    val client = app.flexoHttpClient
+    val config = app.globalFlexoConfig
+    val builder = FlexoRequestBuilder(method, config)
+    val auth = call.request.headers["Authorization"] ?: config.auth
     builder.addHeaders(HttpHeaders.Authorization to auth)
 
-    // apply caller setup
     setup(builder)
 
-    // build request
     val request = builder.build()
-
-    // submit request
     val response = client.request(request)
 
-    // wrap response
     return FlexoResponse(response)
 }
 
